@@ -2589,7 +2589,18 @@ public class AsmMethodSource implements MethodSource {
             }
           }
           // Finally, replace the locals only if both consistency conditions pass.
-          HashSet<Local> newLocalSet = new HashSet<>(boxToNewLoc.values());
+          // Collect the new locals in program order: boxToNewLoc is an IdentityHashMap, so its
+          // iteration order (and a HashSet of JimpleLocals) follows identity hash codes, which
+          // made the local chain, and everything derived from it, differ from run to run.
+          LinkedHashSet<Local> newLocalSet = new LinkedHashSet<>();
+          for (Unit u : jbUnits) {
+            for (Iterator<ValueBox> iterator = u.getUseAndDefBoxesIterator(); iterator.hasNext();) {
+              ValueBox box = iterator.next();
+              if (boxToNewLoc.containsKey(box)) {
+                newLocalSet.add(boxToNewLoc.get(box));
+              }
+            }
+          }
           if (isConsistent && !newLocalSet.contains(null)) {
             jbLocals.addAll(newLocalSet);
             for (Map.Entry<ValueBox, Local> r : boxToNewLoc.entrySet()) {

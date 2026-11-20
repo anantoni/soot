@@ -24,6 +24,8 @@ package soot.toolkits.scalar;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -186,7 +188,9 @@ public class SharedInitializationLocalSplitter extends BodyTransformer {
     return this;
   }
 
-  static class ClusterSet extends HashSet<Cluster> {
+  // Insertion-ordered (here and in the maps below): iterating identity-hashed Locals/Clusters
+  // made the choice of which cluster gets a new local, and the new locals' names, vary per run.
+  static class ClusterSet extends LinkedHashSet<Cluster> {
 
     private int max = -1;
     private int min = -1;
@@ -219,8 +223,23 @@ public class SharedInitializationLocalSplitter extends BodyTransformer {
     final ExceptionalUnitGraph graph
         = ExceptionalUnitGraphFactory.createExceptionalUnitGraph(body, throwAnalysis, omitExceptingUnitEdges);
     final LocalDefs defs = G.v().soot_toolkits_scalar_LocalDefsFactory().newLocalDefs(graph, true);
-    final MultiMap<Local, Cluster> clustersPerLocal = new HashMultiMap<Local, Cluster>();
+    final MultiMap<Local, Cluster> clustersPerLocal = new HashMultiMap<Local, Cluster>() {
+      @Override
+      protected Map<Local, Set<Cluster>> createMap(int initialSize) {
+        return new LinkedHashMap<Local, Set<Cluster>>(initialSize, loadFactor);
+      }
+
+      @Override
+      protected Set<Cluster> newSet() {
+        return new LinkedHashSet<Cluster>();
+      }
+    };
     final MultiMap<Local, Cluster> nonConstantClustersPerLocal = new HashMultiMap<Local, Cluster>() {
+      @Override
+      protected Map<Local, Set<Cluster>> createMap(int initialSize) {
+        return new LinkedHashMap<Local, Set<Cluster>>(initialSize, loadFactor);
+      }
+
       @Override
       protected Set<Cluster> newSet() {
         return new ClusterSet();
@@ -245,7 +264,7 @@ public class SharedInitializationLocalSplitter extends BodyTransformer {
           Local luse = (Local) v;
           Iterator<Unit> allAffectingDefs = defs.getDefsOfAtIterator(luse, s);
 
-          Set<AssignStmt> constantDefs = new HashSet<>();
+          Set<AssignStmt> constantDefs = new LinkedHashSet<>();
           TreeSet<Integer> nonConstantDefs = null;
 
           while (allAffectingDefs.hasNext()) {
@@ -300,7 +319,7 @@ public class SharedInitializationLocalSplitter extends BodyTransformer {
             }
           }
           if (use == null) {
-            Set<Unit> useset = new HashSet<>();
+            Set<Unit> useset = new LinkedHashSet<>();
             useset.add(s);
             Cluster c = new Cluster(useset, constantDefs, nonConstantDefs, indexToStmt);
             clustersPerLocal.put(luse, c);
