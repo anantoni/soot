@@ -22,8 +22,6 @@ package soot;
  * #L%
  */
 
-import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.Table;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
@@ -63,7 +61,22 @@ public class FastHierarchy {
   protected final boolean isDotNet = Options.v().src_prec() == Options.src_prec_dotnet;
   protected final int java_version = Options.v().java_version();
 
-  protected Table<SootClass, NumberedString, SootMethod> typeToVtbl = HashBasedTable.create();
+  /**
+   * Cache of resolveMethod results per receiver class and subsignature. Concurrent: method
+   * resolution runs on many threads during parallel body construction (every invoke resolves
+   * its target), and the unsynchronized HashBasedTable used before was corrupted there
+   * (ClassCastException in HashMap.treeify, and lookups missing entries).
+   */
+  protected final Map<SootClass, Map<NumberedString, SootMethod>> typeToVtbl = new ConcurrentHashMap<>();
+
+  private SootMethod vtblGet(SootClass type, NumberedString subsig) {
+    Map<NumberedString, SootMethod> row = typeToVtbl.get(type);
+    return row == null ? null : row.get(subsig);
+  }
+
+  private void vtblPut(SootClass type, NumberedString subsig, SootMethod method) {
+    typeToVtbl.computeIfAbsent(type, k -> new ConcurrentHashMap<>()).put(subsig, method);
+  }
 
   /**
    * This map holds all key,value pairs such that value.getSuperclass() == key. This is one of the three maps that hold the
@@ -947,11 +960,11 @@ public class FastHierarchy {
     SootMethod candidate = null;
     boolean calleeExist = declaringClass.getMethodUnsafe(subsignature) != null;
     for (SootClass concreteType = baseType; concreteType != null;) {
-      SootMethod previouslyResolvedMethod = typeToVtbl.get(concreteType, methodSignature);
+      SootMethod previouslyResolvedMethod = vtblGet(concreteType, methodSignature);
       if (previouslyResolvedMethod != null && previouslyResolvedMethod.getDeclaringClass() != null) {
         if (!previouslyResolvedMethod.getDeclaringClass().isInterface()) {
           if (baseType != concreteType) {
-            typeToVtbl.put(baseType, methodSignature, previouslyResolvedMethod);
+            vtblPut(baseType, methodSignature, previouslyResolvedMethod);
           }
           return previouslyResolvedMethod;
         } else {
@@ -971,7 +984,7 @@ public class FastHierarchy {
           }
 
           if (!candidate.isAbstract()) {
-            typeToVtbl.put(baseType, methodSignature, candidate);
+            vtblPut(baseType, methodSignature, candidate);
           }
           return candidate;
         }
@@ -1023,7 +1036,7 @@ public class FastHierarchy {
     // We cannot use it in the vtable, since others might ask for
     // concrete methods
         !candidate.isAbstract() && !allowStatic) {
-      typeToVtbl.put(baseType, methodSignature, candidate);
+      vtblPut(baseType, methodSignature, candidate);
     }
     return candidate;
   }
