@@ -33,8 +33,10 @@ import org.objectweb.asm.Opcodes;
 import soot.ClassSource;
 import soot.Dependencies;
 import soot.IFoundFile;
+import soot.Scene;
 import soot.SootClass;
 import soot.SootResolver;
+import soot.SourceLocator;
 import soot.UserInputException;
 
 /**
@@ -63,6 +65,18 @@ public class AsmClassSource extends ClassSource {
     this.foundFile = foundFile;
   }
 
+  private static boolean classExists(String className) {
+    if (Scene.v().containsClass(className)) {
+      return true;
+    }
+    ClassSource source = SourceLocator.v().getClassSource(className);
+    if (source == null) {
+      return false;
+    }
+    source.close();
+    return true;
+  }
+
   @Override
   public Dependencies resolve(SootClass sc) {
     InputStream d = null;
@@ -75,20 +89,32 @@ public class AsmClassSource extends ClassSource {
       deps.typesToSignature.addAll(scb.deps);
       // add the outer class information, could not be called in the builder, since sc needs to be
       // resolved - before calling setOuterClass()
-      if (!sc.hasOuterClass() && className.contains("$")) {
-        String outerClassName;
-        if (className.contains("$-")) {
-          /*
-           * This is a special case for generated lambda classes of jack and jill compiler. Generated lambda classes may
-           * contain '$' which do not indicate an inner/outer class separator if the '$' occurs after a inner class with a
-           * name starting with '-'. Thus we search for '$-' and anything after it including '-' is the inner classes name
-           * and anything before it is the outer classes name.
-           */
-          outerClassName = className.substring(0, className.indexOf("$-"));
-        } else {
-          outerClassName = className.substring(0, className.lastIndexOf('$'));
+      if (!sc.hasOuterClass()) {
+        String outerClassName = scb.declaredOuterClass;
+        if (outerClassName == null && className.contains("$")) {
+          // No InnerClasses entry: guess the outer class from the name, but only if that class
+          // exists. '$' is legal in top-level class names (e.g. the generated JBoss Logging class
+          // SQLExceptionLogging_$logger), and a guess would add a reference to a class that is not
+          // in the program.
+          String guess;
+          if (className.contains("$-")) {
+            /*
+             * This is a special case for generated lambda classes of jack and jill compiler. Generated lambda classes may
+             * contain '$' which do not indicate an inner/outer class separator if the '$' occurs after a inner class with
+             * a name starting with '-'. Thus we search for '$-' and anything after it including '-' is the inner classes
+             * name and anything before it is the outer classes name.
+             */
+            guess = className.substring(0, className.indexOf("$-"));
+          } else {
+            guess = className.substring(0, className.lastIndexOf('$'));
+          }
+          if (classExists(guess)) {
+            outerClassName = guess;
+          }
         }
-        sc.setOuterClass(SootResolver.v().makeClassRef(outerClassName));
+        if (outerClassName != null) {
+          sc.setOuterClass(SootResolver.v().makeClassRef(outerClassName));
+        }
       }
       return deps;
     } catch (IllegalArgumentException e) {

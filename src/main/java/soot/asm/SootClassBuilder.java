@@ -227,9 +227,18 @@ public class SootClassBuilder extends ClassVisitor {
     }
   }
 
+  /**
+   * The outer class that the InnerClasses attribute declares for the class being built (a member class), or null.
+   */
+  String declaredOuterClass;
+
   @Override
   public void visitInnerClass(String name, String outerName, String innerName, int access) {
     klass.addTag(new InnerClassTag(name, outerName, innerName, access));
+
+    if (outerName != null && AsmUtil.toQualifiedName(name).equals(klass.getName())) {
+      declaredOuterClass = AsmUtil.toQualifiedName(outerName);
+    }
 
     // soot does not resolve all inner classes, e.g., java.util.stream.FindOps$FindSink$... is not
     // resolved
