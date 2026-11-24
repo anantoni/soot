@@ -37,9 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
@@ -96,7 +93,6 @@ import soot.util.MultiMap;
  * @author Ben Bellamy
  */
 public class TypeResolver {
-  private static final int SINGLE_THREAD_LIMIT = 100000;
   private static final Function<? super Local, ? extends Collection<Unit>> CREATE_NEW_SET
       = new Function<Local, Collection<Unit>>() {
 
@@ -107,7 +103,6 @@ public class TypeResolver {
 
       };
   private static final int MAX_ITERATION_COUNT = 10000;
-  private static int NUM_CORES = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
 
   protected final JimpleBody jb;
 
@@ -503,70 +498,36 @@ public class TypeResolver {
     return new CastInsertionUseVisitor(countOnly, this.jb, tg, h, maximumCasts);
   }
 
+  /**
+   * The first typing of sigma (in order) with the fewest casts.
+   *
+   * <p>
+   * Counting is sequential on purpose. Counting is not read-only: the use checker writes every visited operand back into
+   * the body, and the cast insertion visitor drops casts it finds unnecessary under the typing it counts for, so each
+   * count sees the body as the earlier counts left it. Counting typings in parallel (as upstream does above 100,000
+   * typings) has the threads edit the same body concurrently, and the chosen typing, the casts and the final body depend
+   * on scheduling.
+   */
   private ITyping minCasts(Collection<ITyping> sigma, IHierarchy h, AtomicInteger castCount) {
     castCount.set(Integer.MAX_VALUE);
     ITyping r = null;
-    int sz = sigma.size();
-    if (sz <= SINGLE_THREAD_LIMIT) {
-      if (sz == 0) {
-        // compatibility
-        castCount.set(-1);
-      }
-      for (ITyping tg : sigma) {
-        int n = this.insertCasts(tg, h, true, castCount.get());
-        int g = castCount.get();
-        if (n < g) {
-          castCount.set(n);
-          r = tg;
-          if (n == 0) {
-            // We can't be better than this
-            break;
-          }
-        }
-      }
-      return r;
-    } else {
-      ExecutorService executionService = Executors.newFixedThreadPool(Math.min(NUM_CORES, sigma.size()));
-      ITyping[] minTyping = new ITyping[1];
-      try {
-        for (ITyping tg : sigma) {
-          executionService.submit(new Runnable() {
-
-            @Override
-            public void run() {
-              final int prevBest = castCount.get();
-              if (prevBest == 0) {
-                // We can't be better than this
-                return;
-              }
-              int n = insertCasts(tg, h, true, prevBest);
-              while (true) {
-                int t = castCount.get();
-                if (n < t) {
-                  if (castCount.compareAndSet(t, n)) {
-                    // update successful!
-                    minTyping[0] = tg;
-                    break;
-                  }
-                } else {
-                  // worse than the current typing
-                  break;
-                }
-              }
-            }
-
-          });
-        }
-      } finally {
-        executionService.shutdown();
-        try {
-          executionService.awaitTermination(100, TimeUnit.DAYS);
-        } catch (InterruptedException e) {
-          throw new RuntimeException("Interrupted during type resolving", e);
-        }
-      }
-      return minTyping[0];
+    if (sigma.isEmpty()) {
+      // compatibility
+      castCount.set(-1);
     }
+    for (ITyping tg : sigma) {
+      int n = this.insertCasts(tg, h, true, castCount.get());
+      int g = castCount.get();
+      if (n < g) {
+        castCount.set(n);
+        r = tg;
+        if (n == 0) {
+          // We can't be better than this
+          break;
+        }
+      }
+    }
+    return r;
   }
 
   static class WorklistElement {
