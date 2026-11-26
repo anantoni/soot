@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -241,9 +242,12 @@ public class PhiNodeManager {
      * A value may appear many times in an exceptional Phi. Hence, the same value may be associated with many UnitBoxes. We
      * build the MultiMap valueToPairs for convenience.
      */
-    MultiMap<Value, ValueUnitPair> valueToPairs = new HashMultiMap<Value, ValueUnitPair>();
+    // In argument order (not a hash multimap): which argument survives depends on
+    // the order the candidates are tried in, and both keys and pairs hash by
+    // identity, so a hash order made the trimmed Phi differ between runs.
+    Map<Value, Set<ValueUnitPair>> valueToPairs = new LinkedHashMap<Value, Set<ValueUnitPair>>();
     for (ValueUnitPair argPair : phiExpr.getArgs()) {
-      valueToPairs.put(argPair.getValue(), argPair);
+      valueToPairs.computeIfAbsent(argPair.getValue(), v -> new LinkedHashSet<ValueUnitPair>()).add(argPair);
     }
 
     /*
