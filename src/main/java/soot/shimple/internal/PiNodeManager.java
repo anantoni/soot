@@ -53,6 +53,7 @@ import soot.toolkits.graph.DominatorNode;
 import soot.toolkits.graph.DominatorTree;
 import soot.toolkits.graph.ReversibleGraph;
 import soot.util.HashMultiMap;
+import soot.util.LinkedHashMultiMap;
 import soot.util.MultiMap;
 
 /**
@@ -109,7 +110,7 @@ public class PiNodeManager {
     update();
 
     this.varToBlocks = new HashMultiMap<Local, Block>();
-    final MultiMap<Local, Block> localsToUsePoints = new SHashMultiMap<Local, Block>();
+    final MultiMap<Local, Block> localsToUsePoints = new LinkedHashMultiMap<Local, Block>();
 
     // compute localsToUsePoints and varToBlocks
     for (Block block : cfg) {

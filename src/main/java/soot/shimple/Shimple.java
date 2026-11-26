@@ -24,6 +24,7 @@ package soot.shimple;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -219,7 +220,7 @@ public class Shimple {
     }
 
     final Chain<Unit> units = body.getUnits();
-    final Set<Unit> preds = new HashSet<Unit>();
+    final Set<Unit> preds = new LinkedHashSet<Unit>();
     final Set<PhiExpr> phis = new HashSet<PhiExpr>();
 
     // find fall-through pred

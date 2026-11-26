@@ -14,7 +14,7 @@ import soot.Body;
 import soot.Trap;
 import soot.Unit;
 import soot.options.Options;
-import soot.util.HashMultiMap;
+import soot.util.LinkedHashMultiMap;
 import soot.util.MultiMap;
 
 /*-
@@ -83,8 +83,8 @@ public class TrapInterruptionGenerator {
   }
 
   private MultiMap<Unit, Trap> getTrapsInRange() {
-    MultiMap<Unit, Trap> trapsInRange = new HashMultiMap<>();
-    MultiMap<Unit, Trap> trapStarts = new HashMultiMap<>();
+    MultiMap<Unit, Trap> trapsInRange = new LinkedHashMultiMap<>();
+    MultiMap<Unit, Trap> trapStarts = new LinkedHashMultiMap<>();
     for (Trap t : body.getTraps()) {
       trapStarts.put(t.getBeginUnit(), t);
     }

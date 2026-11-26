@@ -25,9 +25,10 @@ package soot.toolkits.graph;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Class to compute the DominanceFrontier using Cytron's celebrated efficient algorithm.
@@ -114,7 +115,7 @@ public class CytronDominanceFrontier<N> implements DominanceFrontier<N> {
    * </pre>
    */
   protected void processNode(DominatorNode<N> node) {
-    HashSet<DominatorNode<N>> dominanceFrontier = new HashSet<DominatorNode<N>>();
+    Set<DominatorNode<N>> dominanceFrontier = new LinkedHashSet<DominatorNode<N>>();
 
     // local
     for (DominatorNode<N> succ : dt.getSuccsOf(node)) {

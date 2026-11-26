@@ -25,8 +25,8 @@ package soot.shimple.internal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -395,7 +395,7 @@ public class SPhiExpr implements PhiExpr {
 
   @Override
   public List<UnitBox> getUnitBoxes() {
-    return Collections.unmodifiableList(new ArrayList<UnitBox>(new HashSet<UnitBox>(argPairs)));
+    return Collections.unmodifiableList(new ArrayList<UnitBox>(new LinkedHashSet<UnitBox>(argPairs)));
   }
 
   @Override
@@ -407,7 +407,7 @@ public class SPhiExpr implements PhiExpr {
 
   @Override
   public List<ValueBox> getUseBoxes() {
-    Set<ValueBox> set = new HashSet<ValueBox>();
+    Set<ValueBox> set = new LinkedHashSet<ValueBox>();
     for (ValueUnitPair argPair : argPairs) {
       set.addAll(argPair.getValue().getUseBoxes());
       set.add(argPair);
